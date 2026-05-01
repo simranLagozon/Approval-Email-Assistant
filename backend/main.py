@@ -10,40 +10,73 @@ import os
 
 from routers import auth, emails, actions, summary
 
+# =========================
+# APP INIT
+# =========================
 app = FastAPI(
     title="Approval AI Dashboard API",
     description="Microsoft Outlook + OpenAI powered approval management system",
     version="1.0.0"
 )
 
-# CORS
+# =========================
+# CORS (Allow frontend access)
+# =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # ⚠️ In production, restrict to your domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routers
+# =========================
+# ROUTERS
+# =========================
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(actions.router, prefix="/api/actions", tags=["Actions"])
 app.include_router(summary.router, prefix="/api/summary", tags=["AI Summary"])
 
-# ✅ Correct frontend path
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # go out of backend/
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+# =========================
+# PATH SETUP (IMPORTANT FOR AZURE)
+# =========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)  # go outside backend/
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 
-# ✅ Serve static files
-app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
-app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
+# =========================
+# STATIC FILES
+# =========================
+if os.path.exists(FRONTEND_DIR):
+    app.mount(
+        "/css",
+        StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")),
+        name="css"
+    )
+    app.mount(
+        "/js",
+        StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")),
+        name="js"
+    )
 
-# ✅ Serve index.html
+# =========================
+# FRONTEND ROUTE
+# =========================
 @app.get("/")
 def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"message": "Frontend not found"}
 
+# =========================
+# HEALTH CHECK (FOR AZURE)
+# =========================
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "service": "Approval AI Dashboard",
+        "version": "1.0.0"
+    }
